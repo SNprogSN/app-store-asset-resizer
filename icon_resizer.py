@@ -59,7 +59,13 @@ except ImportError:
 # ── cairosvg opcionális: SVG forrásképek raszterizálásához ────────────────────────
 # Ha jelen van, az SVG fájlok automatikusan 2048 px szélességre raszterizálva
 # lesznek betöltés előtt, így minden kimeneti formátumhoz felhasználhatók.
+# Windows-on a cairosvg libcairo-2.dll natív könyvtárat igényel; ha az hiányzik,
+# svglib + renderPDF + PyMuPDF kombinációt használunk fallbackként
+# (teljesen Cairo-mentes, csak Python wheel-ek kellenek).
 _CAIROSVG_AVAILABLE = False
+_PYMUPDF_AVAILABLE  = False   # svglib + reportlab renderPDF + PyMuPDF fallback
+
+# 1) cairosvg (Linux/macOS, vagy ha libcairo-2.dll elérhető Windowson is)
 try:
     import cairosvg as _cairosvg
     _CAIROSVG_AVAILABLE = True
@@ -78,6 +84,32 @@ except (ImportError, OSError):
                 pass
     except Exception:
         pass
+
+# 2) svglib + renderPDF + PyMuPDF – Windows-barát fallback, nem igényel Cairo DLL-t
+#    A renderPDF modul tisztán Python, a PyMuPDF wheel statikusan linkelt MuPDF-et tartalmaz.
+if not _CAIROSVG_AVAILABLE:
+    try:
+        from svglib.svglib import svg2rlg as _svg2rlg
+        from reportlab.graphics import renderPDF as _renderPDF
+        import fitz as _fitz
+        _PYMUPDF_AVAILABLE = True
+    except ImportError:
+        try:
+            import subprocess as _sp_svg2
+            _rv2 = _sp_svg2.run(
+                [sys.executable, "-m", "pip", "install", "svglib", "PyMuPDF"],
+                capture_output=True, text=True
+            )
+            if _rv2.returncode == 0:
+                try:
+                    from svglib.svglib import svg2rlg as _svg2rlg
+                    from reportlab.graphics import renderPDF as _renderPDF
+                    import fitz as _fitz
+                    _PYMUPDF_AVAILABLE = True
+                except ImportError:
+                    pass
+        except Exception:
+            pass
 
 
 # ══════════════════════════════════════════════════════════════════════════════════
@@ -350,15 +382,30 @@ def load_source_image(path):
     """
     suffix = Path(path).suffix.lower()
     if suffix == ".svg":
-        if not _CAIROSVG_AVAILABLE:
+        if _CAIROSVG_AVAILABLE:
+            png_bytes = _cairosvg.svg2png(url=path, output_width=2048)
+            img = Image.open(io.BytesIO(png_bytes))
+            img.load()
+            return img, True
+        elif _PYMUPDF_AVAILABLE:
+            # SVG → PDF (reportlab renderPDF, Cairo-mentes) → PNG (PyMuPDF, statikus MuPDF)
+            drawing = _svg2rlg(path)
+            if drawing is None:
+                raise RuntimeError(f"SVG betöltése sikertelen (üres rajz): {path}")
+            pdf_bytes = _renderPDF.drawToString(drawing)
+            doc = _fitz.open("pdf", pdf_bytes)
+            page = doc[0]
+            scale = 2048.0 / page.rect.width if page.rect.width else 1.0
+            mat = _fitz.Matrix(scale, scale)
+            pix = page.get_pixmap(matrix=mat, alpha=True)
+            img = Image.open(io.BytesIO(pix.tobytes("png")))
+            img.load()
+            return img, True
+        else:
             raise RuntimeError(
-                "SVG betöltéshez a cairosvg könyvtár szükséges.\n"
-                "Telepítse manuálisan:\n\n    pip install cairosvg"
+                "SVG betöltéshez a cairosvg vagy svglib+PyMuPDF könyvtár szükséges.\n"
+                "Telepítse manuálisan:\n\n    pip install svglib PyMuPDF"
             )
-        png_bytes = _cairosvg.svg2png(url=path, output_width=2048)
-        img = Image.open(io.BytesIO(png_bytes))
-        img.load()
-        return img, True
     img = Image.open(path)
     img.load()
     return img, False

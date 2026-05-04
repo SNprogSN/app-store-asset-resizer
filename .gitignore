@@ -19,6 +19,9 @@ app_icons_kimenet/
 google_play/
 apple_store/
 
+# Projektspecifikus alkalmazás-mappák (forrásképek, generált kimenetek)
+FogyasztasKalkulator/
+
 # OS
 .DS_Store
 Thumbs.db
@@ -30,3 +33,4 @@ desktop.ini
 
 # Fishing diary – not part of this project
 Horgasznaptar/
+FogyasztasKalkulator/

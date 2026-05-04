@@ -1,2 +1,5 @@
 Pillow>=10.0.0
-cairosvg>=2.7.0
+cairosvg>=2.7.0   # Linux/macOS: SVG betöltés (igényel libcairo-2 rendszerkönyvtárat)
+svglib>=1.5.1     # Windows fallback: SVG → PDF konverzió (Cairo-mentes)
+PyMuPDF>=1.23.0   # Windows fallback: PDF → PNG raszterizálás (statikusan linkelt MuPDF)
+
