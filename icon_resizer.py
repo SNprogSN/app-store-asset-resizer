@@ -32,6 +32,7 @@ Függőségek:
 
 import os
 import sys
+import io
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 from pathlib import Path
@@ -53,6 +54,27 @@ except ImportError:
         )
         sys.exit(1)
     from PIL import Image, ImageFilter
+
+
+# ── cairosvg opcionális: SVG forrásképek raszterizálásához ────────────────────────
+# Ha jelen van, az SVG fájlok automatikusan 2048 px szélességre raszterizálva
+# lesznek betöltés előtt, így minden kimeneti formátumhoz felhasználhatók.
+_CAIROSVG_AVAILABLE = False
+try:
+    import cairosvg as _cairosvg
+    _CAIROSVG_AVAILABLE = True
+except ImportError:
+    import subprocess as _sp_svg
+    _rv = _sp_svg.run(
+        [sys.executable, "-m", "pip", "install", "cairosvg"],
+        capture_output=True, text=True
+    )
+    if _rv.returncode == 0:
+        try:
+            import cairosvg as _cairosvg
+            _CAIROSVG_AVAILABLE = True
+        except ImportError:
+            pass
 
 
 # ══════════════════════════════════════════════════════════════════════════════════
@@ -307,6 +329,38 @@ def save_png(img, path, no_alpha=False):
     return path, os.path.getsize(path)
 
 
+def load_source_image(path):
+    """Forrás képfájl betöltése PIL Image-ként.
+
+    PNG/JPG/BMP/WEBP stb. esetén közvetlenül Pillow-val tölti be.
+    SVG esetén cairosvg-vel 2048 px szélességre raszterizálja, majd tölti be.
+    Az SVG méretarányát megőrzi (csak a szélességet rögzíti 2048 px-re).
+
+    Args:
+        path: A forrásfájl elérési útja (str).
+
+    Returns:
+        (PIL Image, is_svg: bool) tuple.
+
+    Raises:
+        RuntimeError: ha SVG betöltés sikertelen (cairosvg hiányzik vagy hibás SVG).
+    """
+    suffix = Path(path).suffix.lower()
+    if suffix == ".svg":
+        if not _CAIROSVG_AVAILABLE:
+            raise RuntimeError(
+                "SVG betöltéshez a cairosvg könyvtár szükséges.\n"
+                "Telepítse manuálisan:\n\n    pip install cairosvg"
+            )
+        png_bytes = _cairosvg.svg2png(url=path, output_width=2048)
+        img = Image.open(io.BytesIO(png_bytes))
+        img.load()
+        return img, True
+    img = Image.open(path)
+    img.load()
+    return img, False
+
+
 # ══════════════════════════════════════════════════════════════════════════════════
 # GUI
 # ══════════════════════════════════════════════════════════════════════════════════
@@ -441,7 +495,8 @@ class AppIconResizer(tk.Tk):
         p = filedialog.askopenfilename(
             title="Forrás kép kiválasztása",
             filetypes=[
-                ("Képfájlok", "*.png *.jpg *.jpeg *.bmp *.webp *.tiff *.gif"),
+                ("Képfájlok", "*.png *.jpg *.jpeg *.bmp *.webp *.tiff *.gif *.svg"),
+                ("SVG vektoros kép", "*.svg"),
                 ("Minden fájl", "*.*"),
             ])
         if p:
@@ -506,13 +561,13 @@ class AppIconResizer(tk.Tk):
             messagebox.showerror("Hiba", "Válasszon legalább egy store-t!"); return
 
         try:
-            img = Image.open(src)
-            img.load()
+            img, is_svg = load_source_image(src)
         except Exception as e:
             messagebox.showerror("Képbetöltési hiba", str(e)); return
 
         self._clear_log()
-        self._write(f"Forrás :  {src}\n", "info")
+        svg_note = "  [SVG → raszterizálva 2048 px]" if is_svg else ""
+        self._write(f"Forrás :  {src}{svg_note}\n", "info")
         self._write(f"Meret  :  {img.size[0]}x{img.size[1]} px | Mod: {img.mode}\n", "info")
         self._write(f"Kimenet:  {out}\n\n", "info")
 
