@@ -63,18 +63,21 @@ _CAIROSVG_AVAILABLE = False
 try:
     import cairosvg as _cairosvg
     _CAIROSVG_AVAILABLE = True
-except ImportError:
-    import subprocess as _sp_svg
-    _rv = _sp_svg.run(
-        [sys.executable, "-m", "pip", "install", "cairosvg"],
-        capture_output=True, text=True
-    )
-    if _rv.returncode == 0:
-        try:
-            import cairosvg as _cairosvg
-            _CAIROSVG_AVAILABLE = True
-        except ImportError:
-            pass
+except (ImportError, OSError):
+    try:
+        import subprocess as _sp_svg
+        _rv = _sp_svg.run(
+            [sys.executable, "-m", "pip", "install", "cairosvg"],
+            capture_output=True, text=True
+        )
+        if _rv.returncode == 0:
+            try:
+                import cairosvg as _cairosvg
+                _CAIROSVG_AVAILABLE = True
+            except (ImportError, OSError):
+                pass
+    except Exception:
+        pass
 
 
 # ══════════════════════════════════════════════════════════════════════════════════
