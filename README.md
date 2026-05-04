@@ -9,12 +9,12 @@ Egyetlen forrásképből automatikusan előállítja az összes szükséges kép
 ### Google Play Store
 | Fájl | Méret | Leírás |
 |------|-------|--------|
-| `play_store_icon_512` | 512×512 | Feltöltési ikon (max 1 MB) |
-| `android_launcher_xxxhdpi` | 192×192 | Launcher ikon xxxhdpi |
-| `android_launcher_xxhdpi` | 144×144 | Launcher ikon xxhdpi |
-| `android_launcher_xhdpi` | 96×96 | Launcher ikon xhdpi |
-| `android_launcher_hdpi` | 72×72 | Launcher ikon hdpi |
-| `android_launcher_mdpi` | 48×48 | Launcher ikon mdpi |
+| `play_store_icon_512` | 512×512 | Feltöltési ikon (max 1 MB) – **PNG + SVG** |
+| `android_launcher_xxxhdpi` | 192×192 | Launcher ikon xxxhdpi – **PNG + SVG** |
+| `android_launcher_xxhdpi` | 144×144 | Launcher ikon xxhdpi – **PNG + SVG** |
+| `android_launcher_xhdpi` | 96×96 | Launcher ikon xhdpi – **PNG + SVG** |
+| `android_launcher_hdpi` | 72×72 | Launcher ikon hdpi – **PNG + SVG** |
+| `android_launcher_mdpi` | 48×48 | Launcher ikon mdpi – **PNG + SVG** |
 | `play_store_feature_1024x500` | 1024×500 | Feature Graphic (max 15 MB) |
 | Képernyőképek – telefon | 1080×1920 | Álló és fekvő |
 | Képernyőképek – 7" tablet | 1200×1920 | Álló és fekvő |
@@ -80,6 +80,29 @@ start.bat
 ## SVG forrásképek
 
 Az alkalmazás SVG vektoros képet is elfogad forrásként. Windows-on – ahol a `cairosvg` natív `libcairo-2.dll` függősége általában hiányzik – automatikusan `svglib` + `PyMuPDF` kombinációt használ, amely nem igényel semmilyen rendszerszintű telepítést.
+
+---
+
+## SVG kimenet (Google Play ikonok)
+
+A Google Play Store feltöltési ikonhoz (`play_store_icon_512`) és az összes Android launcher ikonhoz (`android_launcher_*`) a program **PNG mellé SVG fájlt is generál**.
+
+Az SVG fájl egy szabványos vektoros burok, amelybe a raszteres PNG kép base64 kódolással van beágyazva. Így:
+- megnyitható és szerkeszthető vektoros szerkesztőkben (pl. Inkscape, Adobe Illustrator)
+- hordozható – a képadatok a fájlba vannak csomagolva, nincs külső függőség
+- pontosan megőrzi a pixelméreteket
+
+Példa kimenet egy generálás után:
+```
+google_play/
+  play_store_icon_512_512x512.png
+  play_store_icon_512_512x512.svg      ← új
+  android_launcher_xxxhdpi_192x192.png
+  android_launcher_xxxhdpi_192x192.svg ← új
+  android_launcher_xxhdpi_144x144.png
+  android_launcher_xxhdpi_144x144.svg  ← új
+  ...
+```
 
 ---
 

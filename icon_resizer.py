@@ -364,6 +364,40 @@ def save_png(img, path, no_alpha=False):
     return path, os.path.getsize(path)
 
 
+def save_svg(img, path, w, h):
+    """Kép mentése SVG formátumban, base64-kódolt PNG képként beágyazva.
+
+    Az SVG fájl egy szabványos vektoros burok, amelybe a raszteres kép
+    base64 kódolással van beágyazva. Így megnyitható vektoros szerkesztőkben
+    (pl. Inkscape, Illustrator) és megőrzi a pontos pixelméreteket.
+
+    Args:
+        img:  Pillow Image objektum.
+        path: Teljes cél elérési út (str), .svg kiterjesztéssel.
+        w:    Kép szélessége pixelben (SVG viewBox és width attr.).
+        h:    Kép magassága pixelben (SVG viewBox és height attr.).
+
+    Returns:
+        (path, size_bytes) tuple – a mentett fájl elérési útja és mérete byte-ban.
+    """
+    import base64
+    buf = io.BytesIO()
+    out_img = img.convert("RGBA") if img.mode not in ("RGBA", "RGB") else img
+    out_img.save(buf, "PNG", optimize=True)
+    b64 = base64.b64encode(buf.getvalue()).decode("ascii")
+    svg_content = (
+        f'<svg xmlns="http://www.w3.org/2000/svg" '
+        f'xmlns:xlink="http://www.w3.org/1999/xlink" '
+        f'width="{w}" height="{h}" viewBox="0 0 {w} {h}">\n'
+        f'  <image x="0" y="0" width="{w}" height="{h}" '
+        f'xlink:href="data:image/png;base64,{b64}"/>\n'
+        f'</svg>\n'
+    )
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(svg_content)
+    return path, os.path.getsize(path)
+
+
 def load_source_image(path):
     """Forrás képfájl betöltése PIL Image-ként.
 
@@ -560,8 +594,8 @@ class AppIconResizer(tk.Tk):
             self.v_output.set(p)
 
     # ── Feldolgozás ───────────────────────────────────────────────────────────────
-    def _process_one(self, img, kind, name, w, h, folder, mode_key):
-        """Egyetlen kimeneti kép előállítása és mentése PNG-be.
+    def _process_one(self, img, kind, name, w, h, folder, mode_key, also_svg=False):
+        """Egyetlen kimeneti kép előállítása és mentése PNG-be, opcionálisan SVG-be is.
 
         Args:
             img:      Pillow Image forráskep.
@@ -570,6 +604,7 @@ class AppIconResizer(tk.Tk):
             w, h:     Cél szélesség és magasság pixelben.
             folder:   Kimeneti mappa elérési útja.
             mode_key: Átméretezési mód kulcsszava ld. FEATURE_MODES.
+            also_svg: Ha True, PNG mellé .svg fájl is készül (base64 PNG beágyazással).
 
         Returns:
             True ha sikeres, False hiba esetén (a hiba a naplóba kerül).
@@ -591,6 +626,16 @@ class AppIconResizer(tk.Tk):
                 self._write(f"  [!] {filename}  {sz / 1024:.1f} KB{extra}\n", "warn")
             else:
                 self._write(f"  [OK] {filename}  {sz / 1024:.1f} KB\n", "ok")
+
+            if also_svg:
+                svg_filename = f"{name}_{w}x{h}.svg"
+                svg_path = os.path.join(folder, svg_filename)
+                try:
+                    _, svg_sz = save_svg(out_img, svg_path, w, h)
+                    self._write(f"  [OK] {svg_filename}  {svg_sz / 1024:.1f} KB\n", "ok")
+                except Exception as svg_e:
+                    self._write(f"  [HIBA] {svg_filename}: {svg_e}\n", "err")
+
             return True
 
         except Exception as e:
@@ -651,7 +696,7 @@ class AppIconResizer(tk.Tk):
             self._write("── Google Play Store – Ikonok ─────────────────────────────────────\n", "head")
 
             for name, w, h, _ in GOOGLE_PLAY_ICONS:
-                ok_count += self._process_one(img, "square", name, w, h, gdir, mode_key)
+                ok_count += self._process_one(img, "square", name, w, h, gdir, mode_key, also_svg=True)
                 done += 1
                 self.progress["value"] = done
 
